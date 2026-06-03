@@ -31,8 +31,6 @@ It also supports custom shared instructions that are loaded from `REVIEW_GUIDELI
 /review commit abc123
 /review pr 123
 /review pr https://github.com/owner/repo/pull/123
-/review mr 123
-/review mr https://gitlab.com/group/project/-/merge_requests/123
 /review folder src docs
 /review branch main --extra "focus on performance and error handling"
 ```
