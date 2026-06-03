@@ -3,8 +3,7 @@
  *
  * Provides a `/review` command that prompts the agent to review code changes.
  * Supports multiple review modes:
- * - Review a GitHub pull request (checks out the PR locally)
- * - Review a GitLab merge request (checks out the MR locally)
+ * - Review a GitHub pull request or GitLab merge request (checks out locally)
  * - Review against a base branch (PR/MR style)
  * - Review uncommitted changes
  * - Review a specific commit
@@ -12,10 +11,9 @@
  *
  * Usage:
  * - `/review` - show interactive selector
- * - `/review pr 123` - review GitHub PR #123 (checks out locally)
+ * - `/review pr 123` - review PR/MR #123 (infers GitHub or GitLab from remote)
  * - `/review pr https://github.com/owner/repo/pull/123` - review GitHub PR from URL
- * - `/review mr 123` - review GitLab MR !123 (checks out locally)
- * - `/review mr https://gitlab.com/group/project/-/merge_requests/123` - review GitLab MR from URL
+ * - `/review pr https://gitlab.com/group/project/-/merge_requests/123` - review GitLab MR from URL
  * - `/review uncommitted` - review uncommitted changes directly
  * - `/review branch main` - review against main branch
  * - `/review commit abc123` - review specific commit
@@ -674,8 +672,7 @@ const REVIEW_PRESETS = [
 	{ value: "uncommitted", label: "Review uncommitted changes", description: "" },
 	{ value: "baseBranch", label: "Review against a base branch", description: "(local)" },
 	{ value: "commit", label: "Review a commit", description: "" },
-	{ value: "pullRequest", label: "Review a pull request", description: "(GitHub PR)" },
-	{ value: "mergeRequest", label: "Review a merge request", description: "(GitLab MR)" },
+	{ value: "pullRequest", label: "Review a pull request", description: "(GitHub/GitLab)" },
 	{ value: "folder", label: "Review a folder (or more)", description: "(snapshot, not diff)" },
 ] as const;
 
@@ -949,12 +946,6 @@ export default function reviewExtension(pi: ExtensionAPI) {
 					break;
 				}
 
-				case "mergeRequest": {
-					const target = await showMrInput(ctx);
-					if (target) return target;
-					break;
-				}
-
 				default:
 					return null;
 			}
@@ -1217,34 +1208,13 @@ export default function reviewExtension(pi: ExtensionAPI) {
 
 		// Get PR reference from user
 		const prRef = await ctx.ui.editor(
-			"Enter PR number or URL (GitHub PR or GitLab MR):",
+			"Enter PR number or URL (GitHub/GitLab):",
 			"",
 		);
 
 		if (!prRef?.trim()) return null;
 
 		return await resolvePullRequestTarget(ctx, prRef, { skipInitialPendingChangesCheck: true });
-	}
-
-	/**
-	 * Show MR input and handle checkout
-	 */
-	async function showMrInput(ctx: ExtensionContext): Promise<ReviewTarget | null> {
-		// First check for pending changes that would prevent branch switching
-		if (await hasPendingChanges(pi)) {
-			ctx.ui.notify(CHECKOUT_BLOCKED_BY_PENDING_CHANGES_MESSAGE, "error");
-			return null;
-		}
-
-		// Get MR reference from user
-		const mrRef = await ctx.ui.editor(
-			"Enter MR number or URL (GitHub PR or GitLab MR):",
-			"",
-		);
-
-		if (!mrRef?.trim()) return null;
-
-		return await resolvePullRequestTarget(ctx, mrRef, { skipInitialPendingChangesCheck: true });
 	}
 
 	/**
@@ -1349,7 +1319,7 @@ export default function reviewExtension(pi: ExtensionAPI) {
 	 * Returns the target or a special marker for PR/MR that needs async handling
 	 */
 	type ParsedReviewArgs = {
-		target: ReviewTarget | { type: "pr"; ref: string } | { type: "mr"; ref: string } | null;
+		target: ReviewTarget | { type: "pr"; ref: string } | null;
 		extraInstruction?: string;
 		error?: string;
 	};
@@ -1462,27 +1432,14 @@ export default function reviewExtension(pi: ExtensionAPI) {
 				return { target: { type: "pr", ref }, extraInstruction };
 			}
 
-			case "mr": {
-				const ref = parts[1];
-				if (!ref) return { target: null, extraInstruction };
-				return { target: { type: "mr", ref }, extraInstruction };
-			}
-
 			default:
 				return { target: null, extraInstruction };
 		}
 	}
 
-	/**
-	 * Handle PR/MR checkout from a direct command argument.
-	 */
-	async function handlePullRequestCheckout(ctx: ExtensionContext, ref: string): Promise<ReviewTarget | null> {
-		return await resolvePullRequestTarget(ctx, ref);
-	}
-
 	// Register the /review command
 	pi.registerCommand("review", {
-		description: "Review code changes (PR, MR, uncommitted, branch, commit, or folder)",
+		description: "Review code changes (PR/MR, uncommitted, branch, commit, or folder)",
 		handler: async (args, ctx) => {
 			if (!ctx.hasUI) {
 				ctx.ui.notify("Review requires interactive mode", "error");
@@ -1514,9 +1471,9 @@ export default function reviewExtension(pi: ExtensionAPI) {
 			extraInstruction = parsed.extraInstruction?.trim() || undefined;
 
 			if (parsed.target) {
-				if (parsed.target.type === "pr" || parsed.target.type === "mr") {
+				if (parsed.target.type === "pr") {
 					// Handle checkout (async operation)
-					target = await handlePullRequestCheckout(ctx, parsed.target.ref);
+					target = await resolvePullRequestTarget(ctx, parsed.target.ref);
 					if (!target) {
 						ctx.ui.notify("Review failed. Returning to review menu.", "warning");
 					}
