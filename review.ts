@@ -4,14 +4,14 @@
  * Provides a `/review` command that prompts the agent to review code changes.
  * Supports multiple review modes:
  * - Review a GitHub pull request or GitLab merge request (checks out locally)
- * - Review against a base branch (PR/MR style)
+ * - Review against a base branch (PR style)
  * - Review uncommitted changes
  * - Review a specific commit
  * - Shared custom review instructions (applied to all review modes when configured)
  *
  * Usage:
  * - `/review` - show interactive selector
- * - `/review pr 123` - review PR/MR #123 (infers GitHub or GitLab from remote)
+ * - `/review pr 123` - review PR #123 (infers GitHub or GitLab from remote)
  * - `/review pr https://github.com/owner/repo/pull/123` - review GitHub PR from URL
  * - `/review pr https://gitlab.com/group/project/-/merge_requests/123` - review GitLab MR from URL
  * - `/review uncommitted` - review uncommitted changes directly
@@ -25,7 +25,7 @@
  * - If a REVIEW_GUIDELINES.md file exists in the same directory as .pi,
  *   its contents are appended to the review prompt.
  *
- * Note: PR/MR review requires a clean working tree (no uncommitted changes to tracked files).
+ * Note: PR review requires a clean working tree (no uncommitted changes to tracked files).
  */
 
 import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
@@ -429,7 +429,7 @@ function getStringField(record: Record<string, unknown>, ...keys: string[]): str
 }
 
 /**
- * Parse a bare positive integer PR/MR number. Forge adapters handle URL parsing.
+ * Parse a bare positive integer PR number. Forge adapters handle URL parsing.
  */
 function parsePullRequestNumber(ref: string): number | null {
 	const trimmed = ref.trim();
@@ -1316,7 +1316,7 @@ export default function reviewExtension(pi: ExtensionAPI) {
 
 	/**
 	 * Parse command arguments for direct invocation
-	 * Returns the target or a special marker for PR/MR that needs async handling
+	 * Returns the target or a special marker for PR that needs async handling
 	 */
 	type ParsedReviewArgs = {
 		target: ReviewTarget | { type: "pr"; ref: string } | null;
@@ -1439,7 +1439,7 @@ export default function reviewExtension(pi: ExtensionAPI) {
 
 	// Register the /review command
 	pi.registerCommand("review", {
-		description: "Review code changes (PR/MR, uncommitted, branch, commit, or folder)",
+		description: "Review code changes (PR, uncommitted, branch, commit, or folder)",
 		handler: async (args, ctx) => {
 			if (!ctx.hasUI) {
 				ctx.ui.notify("Review requires interactive mode", "error");
