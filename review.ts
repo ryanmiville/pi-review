@@ -388,10 +388,6 @@ async function hasPendingChanges(pi: ExtensionAPI): Promise<boolean> {
 	return trackedChanges.length > 0;
 }
 
-// Pull request forge support
-// Keep forge implementations here while there are only a few small adapters.
-// If adapters grow substantial or a third forge is added, extract to pull-request-forges.ts.
-
 type PullRequestInfo = {
 	baseBranch: string;
 	title: string;
